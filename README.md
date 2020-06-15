@@ -1,5 +1,5 @@
 # `scramble`
-Anagram generator written in Go. I'll update this when it's actually written lol.
+Anagram generator written in Go. It only works for single words right now, but multiplpe words is in the works.
 
 ### Copyright
 These are from the place where I downloaded the list of english words.
