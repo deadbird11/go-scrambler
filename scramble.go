@@ -2,11 +2,13 @@ package main
 
 import (
 	"bufio"
+	"encoding/gob"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 )
@@ -20,16 +22,19 @@ type (
 
 func main() {
 	if am, err := loadMap(); err == nil {
-		fmt.Println(am)
+		fmt.Println(len(am))
 	} else {
 		panic(err)
 	}
 }
 
+// loadMap - returns a map of strings to slices of english words
+// where each lists contains a set of anagrams
 func loadMap() (anagramMap, error) {
 	return setupFromInternet()
 }
 
+// setupFromInternet - downloads the data from the internet and
 func setupFromInternet() (anagramMap, error) {
 	resp, err := http.Get(url)
 	if err != nil {
@@ -57,6 +62,18 @@ func setupFromInternet() (anagramMap, error) {
 			key := calcKey(line)
 			result[key] = append(result[key], line)
 		}
+	}
+
+	cacheFile, err := os.Create("anagram_map.gob")
+	if err != nil {
+		panic(err)
+	}
+	defer cacheFile.Close()
+
+	encoder := gob.NewEncoder(cacheFile)
+
+	if err := encoder.Encode(result); err != nil {
+		panic(err)
 	}
 
 	return result, nil
