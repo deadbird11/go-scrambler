@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	url   = "https://svnweb.freebsd.org/csrg/share/dict/words?revision=61569&view=co"
+	url   = "http://app.aspell.net/create?max_size=60&spelling=US&max_variant=2&diacritic=strip&special=hacker&special=roman-numerals&download=wordlist&encoding=utf-8&format=inline"
 	fname = "anagram_map.gob"
 )
 
@@ -26,11 +26,14 @@ type (
 func main() {
 	if am, ok := loadMap(); ok {
 		input := strings.ToLower(os.Args[1])
-		result := (*am)[calcKey(input)]
-		for _, val := range result {
-			if val != input {
-				fmt.Println(val)
+		if result, exists := am[calcKey(input)]; exists {
+			for _, val := range result {
+				if val != input {
+					fmt.Println(val)
+				}
 			}
+		} else {
+			fmt.Println("Word not recognized.")
 		}
 	} else {
 		return
@@ -39,7 +42,7 @@ func main() {
 
 // loadMap - returns a map of strings to slices of english words
 // where each lists contains a set of anagrams
-func loadMap() (*anagramMap, bool) {
+func loadMap() (anagramMap, bool) {
 	if result, ok := loadCached(); ok {
 		return result, true
 	}
@@ -48,16 +51,16 @@ func loadMap() (*anagramMap, bool) {
 		return result, true
 	}
 
-	return &anagramMap{}, false
+	return anagramMap{}, false
 }
 
 // loadCached - loads cached map data from previous uses
-func loadCached() (*anagramMap, bool) {
+func loadCached() (anagramMap, bool) {
 	var result anagramMap
 
 	file, err := os.Open(fname)
 	if err != nil {
-		return &anagramMap{}, false
+		return anagramMap{}, false
 	}
 	defer file.Close()
 
@@ -65,30 +68,31 @@ func loadCached() (*anagramMap, bool) {
 	err = decoder.Decode(&result)
 	if err != nil {
 		fmt.Println(err)
-		return &anagramMap{}, false
+		return anagramMap{}, false
 	}
 
-	return &result, true
+	return result, true
 }
 
 // loadRemote - downloads the data from the internet and
 // saves constructed map to a cache file
-func loadRemote() (*anagramMap, bool) {
+func loadRemote() (anagramMap, bool) {
 	resp, err := http.Get(url)
 	if err != nil {
 		fmt.Println(err)
-		return &anagramMap{}, false
+		return anagramMap{}, false
 	}
 	defer resp.Body.Close()
 
 	words, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println(err)
-		return &anagramMap{}, false
+		return anagramMap{}, false
 	}
 
 	r := bufio.NewReader(strings.NewReader(string(words)))
-	result := &anagramMap{}
+	result := anagramMap{}
+	recording := false
 
 	for {
 		if l, _, err := r.ReadLine(); err != nil {
@@ -98,27 +102,39 @@ func loadRemote() (*anagramMap, bool) {
 				log.Fatal(err)
 			}
 		} else {
-			line := strings.ToLower(string(l))
-			key := calcKey(line)
-			(*result)[key] = append((*result)[key], line)
+			if recording {
+				line := strings.ToLower(string(l))
+				key := calcKey(line)
+				result[key] = append(result[key], line)
+			} else if string(l) == "---" {
+				recording = true
+			}
 		}
 	}
 
+	if !writeCache(result) {
+		return anagramMap{}, false
+	}
+
+	return result, true
+}
+
+func writeCache(am anagramMap) bool {
 	cacheFile, err := os.Create(fname)
 	if err != nil {
 		fmt.Println(err)
-		return &anagramMap{}, false
+		return false
 	}
 	defer cacheFile.Close()
 
 	encoder := gob.NewEncoder(cacheFile)
 
-	if err := encoder.Encode(result); err != nil {
+	if err := encoder.Encode(am); err != nil {
 		fmt.Println(err)
-		return &anagramMap{}, false
+		return false
 	}
 
-	return result, true
+	return true
 }
 
 func calcKey(s string) string {
