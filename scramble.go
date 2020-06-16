@@ -33,7 +33,7 @@ func main() {
 				}
 			}
 		} else {
-			fmt.Println("Word not recognized.")
+			fmt.Println("No anagrams could be found.")
 		}
 	} else {
 		return
